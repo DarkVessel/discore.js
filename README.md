@@ -28,11 +28,6 @@
         <img alt="GitHub stars" src="https://img.shields.io/github/stars/zargovv/discore.js?logo=github">
       </a>
     </div>
-    <div>
-      <a href="https://twitter.com/intent/follow?screen_name=zargovv">
-        <img src="https://img.shields.io/twitter/follow/zargovv?style=flat&logo=twitter" alt="Follow On Twitter">
-      </a>
-    </div>
   </p>
   <p>
     <a href="https://nodei.co/npm/discore.js/">
@@ -68,26 +63,37 @@ new Core({
 ```js
 const { Core } = require('discore.js');
 new Core({
-  eventsFolder: 'events',
-  commandsFolder: 'commands',
-  monitorsFolder: 'monitors',
-  triggersFolder: 'triggers',
-  token: null,
+  folders: {
+    inhibitors: 'inhibitors',
+    commands: 'commands',
+    monitors: 'monitors',
+    triggers: 'triggers',
+    events: 'events',
+  },
 
-  // To make multiple prefixes you can make an array
-  // Example: ['!', '.']
+  prefixOptions: {
+    spaceSeparator: false, // Allow space after prefix
+    ignoreCase: false, // Ignore prefix case
+    mention: false, // Allow using @mention as prefix
+  },
+
+  commandOptions: {
+    argsSeparator: ' ', // Regular expressions are allowed
+    permLevels: new PermissionLevels(),
+    ignoreCase: false,
+    ignoreBots: true, // Prevents bots from using commands.
+    ignoreSelf: true, // Prevents the bot from using commands on itself.
+  },
+
+  mainPath: '.',
+
+  // Displays the bot as online from a mobile
+  mobile: false,
+
+  // Regular expressions and arrays (Strings, RegExps) are allowed.
   prefix: undefined,
 
-  // Set to true if you want to allow @mentioning the bot used as a prefix
-  mentionPrefix: false,
-
-  spaceAfterPrefix: false,
-  splitArgs: ' ',
-  ignoreCase: true,
-  ignorePrefixCase: true,
-  permLevels: new PermissionLevels(),
-  ignoreSelf: true,
-  ignoreBots: true,
+  token: null,
   db: null,
 });
 ```
@@ -96,10 +102,9 @@ new Core({
 
 ```js
 this.client.config.guild.set('guild_id', {
-  // Default settings:
   prefix: undefined,
   mentionPrefix: false,
-  splitArgs: ' ',
+  argsSeparator: ' ',
   ignoreCase: true,
   ignorePrefixCase: true,
   permLevels: new PermissionLevels(),
@@ -114,10 +119,6 @@ this.client.config.guild.add('guild_id', {
 });
 ```
 
-#### Methods
-
-- `uniqid.gen()` // Generates unique identificator
-
 ### Events
 
 Events are placed in `.\events\`(**eventsFolder** option).
@@ -125,27 +126,38 @@ For instance creating `.\events\Main\ready.js` will be an event `ready` in the `
 
 Their structure (options argument defined with default configuration):
 
+#### All Custom Events
+
+- `load` (Store).
+- `load:{type}s` (Store).
+
+- `voiceChannelJoin` (oldState: VoiceState, newState: VoiceState)
+- `voiceChannelSwitch` (oldState: VoiceState, newState: VoiceState)
+- `voiceChannelLeave` (oldState: VoiceState, newState: VoiceState)
+
+- `dbConnect`
+- `dbError`
+- `dbDisconnect`
+
 ```js
 const { Event } = require('discore.js');
 
 module.exports = class extends Event {
   get options() {
     return {
-      // Will run run() method if true, otherwise disabledRun() method.
       enabled: true,
-      key: null, // Same as name but more important.
-      name: null, // Key is going to be event name.
-      once: false, // Unloads after first use if true.
-      id: undefined, // UniqID if not defined. Used to get the event.
+      name: null, // Event name.
+      once: false, // Unloads after first use.
+      id: undefined, // Used to get the event.
     };
-    // If key and name are null then they will be defined as file name.
-    // For example, ready.js is gonna be 'ready'
+    // If name is not defined then it will be defined as file name.
+    // For example, ready.js will be 'ready'
   }
 
   get customOptions() {
     return {
       // You can put any options you want.
-      // And use it via this.custom.
+      // And use it via this.custom
     };
   }
 
@@ -159,6 +171,7 @@ module.exports = class extends Event {
     };
   }
 
+  // Params of the event
   run(...params) {
     // Event code.
     // Runs only if enabled.
@@ -171,7 +184,7 @@ module.exports = class extends Event {
   init() {
     // Optional method. Runs on 'ready'
     // event so you are able to use discord
-    // data via this.client.
+    // data via this.client
   }
 };
 ```
@@ -202,26 +215,22 @@ const { Command } = require('discore.js');
 module.exports = class extends Command {
   get options() {
     return {
-      // Will run run() method if true, otherwise disabledRun() method.
       enabled: true,
-      key: null, // Same as name but more important.
-      name: null, // Key is going to be command name.
-      id: undefined, // UniqID if not defined. Used to get the event.
+      name: null, // Command name.
+      id: undefined, // Used to get the command.
       cooldown: 0, // In milliseconds
       aliases: [],
       permLevel: 0, // Runs noPermsRun() method if tests not passed.
-      description: undefined,
-      usage: undefined,
-      once: false, // Unloads after first use if true.
+      once: false, // Unloads after first use.
     };
-    // If key and name are null then they will be defined as file name.
-    // For example, test.js is gonna be 'test'
+    // If name is not defined then it will be defined as file name.
+    // For example, test.js will be 'test'
   }
 
   get customOptions() {
     return {
       // You can put any options you want.
-      // And use it via this.custom.
+      // And use it via this.custom
     };
   }
 
@@ -249,10 +258,15 @@ module.exports = class extends Command {
     // but runs only if Permission Level test is not passed.
   }
 
+  cdRun(message, args) {
+    // Same as run
+    // but runs only if user has active cooldown.
+  }
+
   init() {
     // Optional method. Runs on 'ready'
     // event so you are able to use discord
-    // data via this.client.
+    // data via this.client
   }
 };
 ```
@@ -270,19 +284,6 @@ module.exports = class extends Command {
 
 - `categories`
 
-##### Method Examples
-
-```js
-const command = this.client.commands.get('command');
-command
-  .toggle()
-  .enable()
-  .disable()
-  .unload()
-  .reload()
-  .toString();
-```
-
 ### Monitors
 
 Monitors are placed in `.\monitors\`(**monitorsFolder** option).
@@ -297,21 +298,19 @@ const { Monitor } = require('discore.js');
 module.exports = class extends Monitor {
   get options() {
     return {
-      // Will run run() method if true, otherwise disabledRun() method.
       enabled: true,
-      key: null, // Same as name but more important.
-      name: null, // Key is going to be monitor name.
-      id: undefined, // UniqID if not defined. Used to get the monitor.
-      once: false, // Unloads after first use if true.
+      name: null, // Monitor name.
+      id: undefined, // Used to get the command.
+      once: false, // Unloads after first use.
     };
-    // If key and name are null then they will be defined as file name.
-    // For example, filter.js is gonna be 'filter'
+    // If name is not defined then it will be defined as file name.
+    // For example, filter.js will be 'filter'
   }
 
   get customOptions() {
     return {
       // You can put any options you want.
-      // And use it via this.custom.
+      // And use it via this.custom
     };
   }
 
@@ -337,7 +336,7 @@ module.exports = class extends Monitor {
   init() {
     // Optional method. Runs on 'ready'
     // event so you are able to use discord
-    // data via this.client.
+    // data via this.client
   }
 };
 ```
@@ -369,21 +368,19 @@ const { Trigger } = require('discore.js');
 module.exports = class extends Trigger {
   get options() {
     return {
-      // Will run run() method if true, otherwise disabledRun() method.
       enabled: true,
-      key: null, // Same as name but more important.
-      name: null, // Key is going to be trigger name.
-      id: undefined, // UniqID if not defined. Used to get the trigger.
-      once: false, // Unloads after first use if true.
+      name: null, // Monitor name.
+      id: undefined, // Used to get the command.
+      once: false, // Unloads after first use.
     };
-    // If key and name are null then they will be defined as file name.
-    // For example, xp.js is gonna be 'xp'
+    // If name is not defined then it will be defined as file name.
+    // For example, xp.js will be 'xp'
   }
 
   get customOptions() {
     return {
       // You can put any options you want.
-      // And use it via this.custom.
+      // And use it via this.custom
     };
   }
 
@@ -409,7 +406,7 @@ module.exports = class extends Trigger {
   init() {
     // Optional method. Runs on 'ready'
     // event so you are able to use discord
-    // data via this.client.
+    // data via this.client
   }
 };
 ```
@@ -442,21 +439,19 @@ const { Inhibitor } = require('discore.js');
 module.exports = class extends Inhibitor {
   get options() {
     return {
-      // Will run run() method if true, otherwise disabledRun() method.
       enabled: true,
-      key: null, // Same as name but more important.
-      name: null, // Key is going to be event name.
-      id: undefined, // UniqID if not defined. Used to get the event.
-      once: false, // Unloads after first use if true.
+      name: null, // Monitor name.
+      id: undefined, // Used to get the command.
+      once: false, // Unloads after first use.
     };
-    // If key and name are null then they will be defined as file name.
-    // For example, inhibit.js is gonna be 'inhibit'
+    // If name is not defined then it will be defined as file name.
+    // For example, server.js will be 'server'
   }
 
   get customOptions() {
     return {
       // You can put any options you want.
-      // And use it via this.custom.
+      // And use it via this.custom
     };
   }
 
@@ -473,6 +468,8 @@ module.exports = class extends Inhibitor {
   run(message, cmd) {
     // Inhibitor code.
     // Runs only if enabled.
+    // Should return true in the end.
+    // Doesn't run commands if return false or undefined.
   }
 
   disabledRun(message, cmd) {
@@ -482,7 +479,7 @@ module.exports = class extends Inhibitor {
   init() {
     // Optional method. Runs on 'ready'
     // event so you are able to use discord
-    // data via this.client.
+    // data via this.client
   }
 };
 ```
@@ -511,6 +508,7 @@ You can use load() method!
 
 - `load()`
 - `get()`
+- `search()`
 
 ##### Method Examples
 
@@ -524,6 +522,9 @@ this.client.events.get('event_name'); // Same as previous example
 this.client.commands.get('command_id');
 this.client.commands.get('command_name'); // Same as previous example
 this.client.commands.get('command_alias'); // Same as previous example
+
+this.client.commands.search('hlp');
+this.client.commands.search('hlep');
 ```
 
 ### Permission Levels
@@ -531,29 +532,28 @@ this.client.commands.get('command_alias'); // Same as previous example
 Their structure:
 
 ```js
-const { Core, PermissionLevels } = require('discore.js');
-const config = require('./config');
+const { PermissionLevels } = require('discore.js');
 
 const permLevels = new PermissionLevels();
 permLevels
-  .add(0, true, msg => msg.author.id === '1') // Throws error.
-  // Permissions Level 1 is true only if message author id is '1'
-  .add(1, false, msg => msg.author.id === '1')
-  // Same as previous example
+  .add(0, true, (msg) => msg.author.id === '1')
+
+  // Permissions Level 1 gives access only if message author id is equal to '1'
+  .add(1, false, (msg) => msg.author.id === '1')
+
+  // Permissions Level 2 gives access only to the bot
   .addLevel(2, false, (msg, client) => {
     return msg.author.id === client.user.id;
   });
 
-// Test for a role.
-permLevels.add(3, true, msg => msg.member.roles.has('roleid'));
+// Tests for a role.
+permLevels.add(3, true, (msg) => msg.member.roles.has('roleid'));
 
 // Testing. Returns boolean.
 permLevels.test(3, msg);
 
 // You can define client as third argument if needed.
 permLevels.test(2, msg, this.client);
-
-new Core(config);
 ```
 
 #### Methods
@@ -616,62 +616,29 @@ setTimeout(() => msg.delete(), timeout);
 - `pages`
 - `filter`
 
-### Embed ( RichEmbed )
+## Databases
 
-Their structure:
+###### `DBs you use but much faster, powerful and object-oriented`
 
-```js
-const { Embed } = require('discore.js');
-
-const embed = new Embed()
-  .addBlankField()
-  .addField('Title', 'Description')
-  .attachFile(file)
-  .attachFiles(files)
-  .setAuthor('author', 'image url')
-  .setColor(color)
-  .setDescription('description')
-  .setFooter('footer', 'image url')
-  .setImage('image url')
-  .setThumbnail('image url')
-  .setTimestamp()
-  .setTitle('title')
-  .setURL('url');
-```
+### Document
 
 #### Methods
 
-- `addBlankField()`
-- `addField()`
-- `attachFile()`
-- `attachFiles()`
-- `setAuthor()`
-- `setColor()`
-- `setDescription()`
-- `setFooter()`
-- `setImage()`
-- `setThumbnail()`
-- `setTimestamp()`
-- `setTitle()`
-- `setURL()`
+- `save()`
+- `populate()`
+- `json()`
 
-#### Properties
+#### Examples
 
-- `author`
-- `color`
-- `description`
-- `fields`
-- `file`
-- `files`
-- `footer`
-- `image`
-- `length`
-- `thumbnail`
-- `timestamp`
-- `title`
-- `url`
+```js
+const doc = await db.getCollection('users').findOne({ id: 'some id' });
 
-## Databases
+doc.someProp = 'some value';
+
+doc.save().then(() => console.log('Saved!'));
+```
+
+### Global Model Events
 
 ### MongoDB
 
@@ -689,31 +656,27 @@ new Core({
 });
 ```
 
-#### Events
-
-- `dbConnected`
-- `dbError`
-- `dbDisconnected`
-
 #### Methods
 
 - `addModel()`
 - `open()` ( Open connection )
 - `close()` ( Close connection )
+- `getCollection()`
 
 #### Properties
 
-- `collection`
+- `collections`
+- `connection`
 
 ### DB Models
 
 Their structure:
 
 ```js
-// Must define all default properties.
-// You can leave properties as undefined.
+// If default value is not defined, it will be set to undefined.
+// You can leave values as undefined.
 const data = {
-  id: { type: Mongo.Types.String, default: undefined },
+  id: Mongo.Types.String,
   messageCount: { type: Mongo.Types.Number, default: 0 },
 };
 
@@ -734,108 +697,175 @@ db.addModel('modelName', data);
 
 #### Methods
 
-- `hasOne()`
+- `fetch()`
+- `getData()`
+- `filterKeys()`
+- `filter()`
+- `findKey()`
 - `findOne()`
+- `getOne()`
 - `insertOne()`
+- `insertMany()`
 - `deleteOne()`
+- `deleteMany()`
 - `updateOne()`
 - `upsertOne()`
 
-##### hasOne()
+##### fetch()
 
 ```js
-// Working with model from previous example.
-// You can use `db['modelName']`
+// Fetches all documents from the database.
+// Returns Promise<Collection<string, MongoDocument>>
 
-// Searches for document with `id` of '123'.
-let res1 = db.modelName.hasOne({ id: '123' });
-let res2 = db.modelName.hasOne('id', '123'); // Same.
-let res3 = db.modelName.hasOne(val => val.id === '123'); // Same.
+const collection = db.getCollection('name');
 
-console.log(typeof res); // Returns true or false (Boolean).
-console.log(typeof res2); // Same.
-console.log(typeof res3); // Same.
+const data = await collection.fetch();
+```
+
+##### getData()
+
+```js
+// Returns data from local storage.
+// Returns Promise<Collection<string, MongoDocument>>
+
+const collection = db.getCollection('name');
+
+const data = await collection.getData();
+```
+
+##### filterKeys()
+
+```js
+// Filters the collection and returns only keys.
+// Returns Promise<string[]>
+
+const collection = db.getCollection('name');
+
+const keys = await collection.filterKeys(
+  (value) => value.username === 'zargovv'
+);
+```
+
+##### filter()
+
+```js
+// Filters the collection.
+// Returns Promise<Collection<string, MongoDocument>>
+
+const collection = db.getCollection('name');
+
+const newCollection = await collection.filter(
+  (value) => value.username === 'zargovv'
+);
+```
+
+##### findKey()
+
+```js
+// Finds document and returns key.
+// Returns Promise<string | undefined>
+
+const collection = db.getCollection('name');
+
+const result = await collection.findKey(
+  (value) => value.username === 'zargovv'
+);
 ```
 
 ##### findOne()
 
 ```js
-// Working with model from previous example.
-// You can use `db['modelName']` or `db.modelName`
+// Finds document.
+// Returns Promise<Document | undefined>
 
-// Searches for document with `id` of '123'.
-let res1 = db.modelName.findOne({ id: '123' });
-let res2 = db.modelName.findOne('id', '123'); // Same.
-let res3 = db.modelName.findOne(val => val.id === '123'); // Same.
+const collection = db.getCollection('name');
 
-/*
-  Returns document. If there is no document
-  then you will getdefault settings which
-  were defined by yourself.
+const result = await collection.findOne(
+  (value) => value.username === 'zargovv'
+);
+```
 
-  That means you can not get undefined or
-  null.
-*/
-console.log(typeof res);
-console.log(typeof res2); // Same.
-console.log(typeof res3); // Same.
+##### getOne()
+
+```js
+// Gets document
+// (Searches for it, if there is no one, then returns default values).
+// Returns Promise<Document | undefined>
+
+const collection = db.getCollection('name');
+
+const document = await collection.getOne(
+  (value) => value.username === 'zargovv'
+);
 ```
 
 ##### insertOne()
 
 ```js
-// **upsertOne() method is recommended to use!**
-db.modelName.insertOne({
-  id: '3213',
-  messageCount: 1, // If not defined, going to be 0.
-});
+// Creates new document
+// Returns Document
+
+const collection = db.getCollection('name');
+
+const result = collection.insertOne({ id: '1', username: 'zargovv' });
+```
+
+##### insertMany()
+
+```js
+// Creates new documents
+// Returns Document[]
+
+const collection = db.getCollection('name');
+
+const result = collection.insertMany([
+  { id: '1', username: 'zargovv' },
+  { id: '2', username: 'discore.js' },
+]);
 ```
 
 ##### deleteOne()
 
 ```js
-// returns null or document.
-db.modelName.deleteOne({ id: '3213' });
+// Deletes document
+// Returns Promise<Document | undefined>
 
-/*
-  Does the same thing but returns null
-  because document is already deleted.
-*/
-db.modelName.deleteOne('id', '3212');
+const collection = db.getCollection('name');
 
-// Same as previous example.
-db.modelName.deleteOne(val => val.id === '3212');
+const result = await collection.deleteOne({ username: 'zargovv' });
+```
+
+##### deleteMany()
+
+```js
+// Deletes document
+// Returns Promise<Document[]>
+
+const collection = db.getCollection('messages');
+
+const result = collection.deleteMany((doc) => doc.messageCount < 1);
 ```
 
 ##### updateOne()
 
 ```js
-// **upsertOne() method is recommended to use!**
+// Updates document. Returns undefined if document wasn't found.
+// Returns Promise<Document | undefined>
 
-/*
-  All of these examples are going to search
-  for `id` of '3213' and update 
-*/
-db.modelName.updateOne({ id: '3213' }, { messageCount: 2 });
-db.modelName.updateOne('id', '3212', { messageCount: 2 });
-db.modelName.updateOne(val => val.id === '3212', { messageCount: 2 });
+const collection = db.getCollection('name');
+
+const result = await collection.updateOne({ username: 'zargovv' }, { id: '0' });
 ```
 
 ##### upsertOne()
 
 ```js
-/*
-  upsertOne() method is trying to update
-  a document. If document is not exists then
-  is going to insert it.
-*/
+// Updates document. Creates new one if not found.
+// Returns Promise<Document>
 
-// All of these examples are going to search
-// for `id` of '3213' and update
-// messageCount to 2.
-db.modelName.upsertOne({ id: '3213' }, { messageCount: 2 });
-db.modelName.upsertOne('id', '3212', { messageCount: 2 });
-db.modelName.upsertOne(val => val.id === '3212', { messageCount: 2 });
+const collection = db.getCollection('name');
+
+const result = await collection.updateOne({ username: 'zargovv' }, { id: '0' });
 ```
 
 ### MySQL
@@ -845,7 +875,7 @@ Structure:
 ```js
 const { Core, MySql } = require('discore.js');
 
-const db = new MySql('url');
+const db = new MySql(/* connection url(string) or connection options(object) */);
 
 new Core({
   db,
@@ -854,29 +884,30 @@ new Core({
 
 #### Events
 
-- `dbConnected`
+- `dbConnect`
 - `dbError`
-- `dbDisconnected`
+- `dbDisconnect`
 
 #### Methods
 
 - `addModel()`
 - `open()` ( Open connection )
 - `close()` ( Close connection )
+- `getCollection()`
 
 #### Properties
 
-- `collection`
+- `collections`
 
 ### DB Models
 
 Their structure:
 
 ```js
-// Must define all default properties.
-// You can leave properties as undefined.
+// If default value is not defined, it will be set to undefined.
+// You can leave values as undefined.
 const data = {
-  id: { type: MySql.Types.VarChar(18), default: undefined },
+  id: MySql.Types.VarChar(18),
   messageCount: { type: MySql.Types.Int, default: 0 },
   rowId: {
     type: MySql.Types.Int(null, 'NOT NULL', 'AUTO_INCREMENT', 'PRIMARY'),
@@ -914,108 +945,380 @@ db.addModel('modelName', data);
 
 #### Methods
 
-- `hasOne()`
+- `fetch()`
+- `getData()`
+- `filterKeys()`
+- `filter()`
+- `findKey()`
 - `findOne()`
+- `getOne()`
 - `insertOne()`
+- `insertMany()`
 - `deleteOne()`
+- `deleteMany()`
 - `updateOne()`
 - `upsertOne()`
 
-##### hasOne()
+##### fetch()
 
 ```js
-// Working with model from previous example.
-// You can use `db['modelName']`
+// Fetches all documents from the database.
+// Returns Promise<Collection<string, MongoDocument>>
 
-// Searches for document with `id` of '123'.
-let res1 = db.modelName.hasOne({ id: '123' });
-let res2 = db.modelName.hasOne('id', '123'); // Same.
-let res3 = db.modelName.hasOne(val => val.id === '123'); // Same.
+const collection = db.getCollection('name');
 
-console.log(typeof res); // Returns true or false (Boolean).
-console.log(typeof res2); // Same.
-console.log(typeof res3); // Same.
+collection.fetch().then((data) => {});
+```
+
+##### getData()
+
+```js
+// Returns data from local storage.
+// Returns Promise<Collection<string, MongoDocument>>
+
+const collection = db.getCollection('name');
+
+const data = await collection.getData();
+```
+
+##### filterKeys()
+
+```js
+// Filters the collection and returns only keys.
+// Returns Promise<string[]>
+
+const collection = db.getCollection('name');
+
+const keys = await collection.filterKeys(
+  (value) => value.username === 'zargovv'
+);
+```
+
+##### filter()
+
+```js
+// Filters the collection.
+// Returns Promise<Collection<string, MongoDocument>>
+
+const collection = db.getCollection('name');
+
+const newCollection = await collection.filter(
+  (value) => value.username === 'zargovv'
+);
+```
+
+##### findKey()
+
+```js
+// Finds document and returns key.
+// Returns Promise<string | undefined>
+
+const collection = db.getCollection('name');
+
+const result = await collection.findKey(
+  (value) => value.username === 'zargovv'
+);
 ```
 
 ##### findOne()
 
 ```js
-// Working with model from previous example.
-// You can use `db['modelName']` or `db.modelName`
+// Finds document.
+// Returns Promise<Document | undefined>
 
-// Searches for document with `id` of '123'.
-let res1 = db.modelName.findOne({ id: '123' });
-let res2 = db.modelName.findOne('id', '123'); // Same.
-let res3 = db.modelName.findOne(val => val.id === '123'); // Same.
+const collection = db.getCollection('name');
 
-/*
-  Returns document. If there is no document
-  then you will getdefault settings which
-  were defined by yourself.
+const result = await collection.findOne(
+  (value) => value.username === 'zargovv'
+);
+```
 
-  That means you can not get undefined or
-  null.
-*/
-console.log(typeof res);
-console.log(typeof res2); // Same.
-console.log(typeof res3); // Same.
+##### getOne()
+
+```js
+// Gets document
+// (Searches for it, if there is no one, then returns default values).
+// Returns Promise<Document | undefined>
+
+const collection = db.getCollection('name');
+
+const document = await collection.getOne(
+  (value) => value.username === 'zargovv'
+);
 ```
 
 ##### insertOne()
 
 ```js
-// **upsertOne() method is recommended to use!**
-db.modelName.insertOne({
-  id: '3213',
-  messageCount: 1, // If not defined, going to be 0.
-});
+// Creates new document
+// Returns Document
+
+const collection = db.getCollection('name');
+
+const result = collection.insertOne({ id: '1', username: 'zargovv' });
+```
+
+##### insertMany()
+
+```js
+// Creates new documents
+// Returns Document[]
+
+const collection = db.getCollection('name');
+
+const result = collection.insertMany([
+  { id: '1', username: 'zargovv' },
+  { id: '2', username: 'discore.js' },
+]);
 ```
 
 ##### deleteOne()
 
 ```js
-// returns null or document.
-db.modelName.deleteOne({ id: '3213' });
+// Deletes document
+// Returns Promise<Document | undefined>
 
-/*
-  Does the same thing but returns null
-  because document is already deleted.
-*/
-db.modelName.deleteOne('id', '3212');
+const collection = db.getCollection('name');
 
-// Same as previous example.
-db.modelName.deleteOne(val => val.id === '3212');
+const result = collection.deleteOne({ username: 'zargovv' });
+```
+
+##### deleteMany()
+
+```js
+// Deletes document
+// Returns Promise<Document[]>
+
+const collection = db.getCollection('messages');
+
+const result = collection.deleteMany((doc) => doc.messageCount < 1);
 ```
 
 ##### updateOne()
 
 ```js
-// **upsertOne() method is recommended to use!**
+// Updates document. Returns undefined if document wasn't found.
+// Returns Promise<Document | undefined>
 
-/*
-  All of these examples are going to search
-  for `id` of '3213' and update 
-*/
-db.modelName.updateOne({ id: '3213' }, { messageCount: 2 });
-db.modelName.updateOne('id', '3212', { messageCount: 2 });
-db.modelName.updateOne(val => val.id === '3212', { messageCount: 2 });
+const collection = db.getCollection('name');
+
+const result = await collection.updateOne({ username: 'zargovv' }, { id: '0' });
 ```
 
 ##### upsertOne()
 
 ```js
-/*
-  upsertOne() method is trying to update
-  a document. If document is not exists then
-  is going to insert it.
-*/
+// Updates document. Creates new one if not found.
+// Returns Promise<Document>
 
-// All of these examples are going to search
-// for `id` of '3213' and update
-// messageCount to 2.
-db.modelName.upsertOne({ id: '3213' }, { messageCount: 2 });
-db.modelName.upsertOne('id', '3212', { messageCount: 2 });
-db.modelName.upsertOne(val => val.id === '3212', { messageCount: 2 });
+const collection = db.getCollection('name');
+
+const result = await collection.updateOne({ username: 'zargovv' }, { id: '0' });
+```
+
+### Json
+
+Structure:
+
+```js
+const { Core, Json } = require('discore.js');
+
+const db = new Json(/* path to the directory */);
+
+new Core({
+  db,
+});
+```
+
+#### Methods
+
+- `addModel()`
+- `getCollection()`
+- `save()`
+
+#### Properties
+
+- `collections`
+
+### DB Models
+
+Their structure:
+
+```js
+// Default values.
+// You can leave values as undefined.
+const data = {
+  id: undefined,
+  messageCount: 0,
+  rowId: 0,
+};
+
+db.addModel('modelName', data);
+```
+
+#### Methods
+
+- `fetch()`
+- `getData()`
+- `filterKeys()`
+- `filter()`
+- `findKey()`
+- `findOne()`
+- `getOne()`
+- `insertOne()`
+- `insertMany()`
+- `deleteOne()`
+- `deleteMany()`
+- `updateOne()`
+- `upsertOne()`
+
+##### fetch()
+
+```js
+// Fetches all documents from the database.
+// Returns Promise<Collection<string, Document>>
+
+const collection = db.getCollection('name');
+
+collection.fetch().then((data) => {});
+```
+
+##### getData()
+
+```js
+// Returns data from local storage.
+// Returns Promise<Collection<string, MongoDocument>>
+
+const collection = db.getCollection('name');
+
+const data = await collection.getData();
+```
+
+##### filterKeys()
+
+```js
+// Filters the collection and returns only keys.
+// Returns string[]
+
+const collection = db.getCollection('name');
+
+const keys = collection.filterKeys((value) => value.username === 'zargovv');
+```
+
+##### filter()
+
+```js
+// Filters the collection.
+// Returns Collection<string, Document>
+
+const collection = db.getCollection('name');
+
+const newCollection = collection.filter(
+  (value) => value.username === 'zargovv'
+);
+```
+
+##### findKey()
+
+```js
+// Finds document and returns key.
+// Returns string | undefined
+
+const collection = db.getCollection('name');
+
+const result = collection.findKey((value) => value.username === 'zargovv');
+```
+
+##### findOne()
+
+```js
+// Finds document.
+// Returns Document | undefined
+
+const collection = db.getCollection('name');
+
+const result = collection.findOne((value) => value.username === 'zargovv');
+```
+
+##### getOne()
+
+```js
+// Gets document
+// (Searches for it, if there is no one, then returns default values).
+// Returns Document | undefined
+
+const collection = db.getCollection('name');
+
+const document = collection.getOne((value) => value.username === 'zargovv');
+```
+
+##### insertOne()
+
+```js
+// Creates new document
+// Returns Document
+
+const collection = db.getCollection('name');
+
+const result = collection.insertOne({ id: '1', username: 'zargovv' });
+```
+
+##### insertMany()
+
+```js
+// Creates new documents
+// Returns Document[]
+
+const collection = db.getCollection('name');
+
+const result = collection.insertMany([
+  { id: '1', username: 'zargovv' },
+  { id: '2', username: 'discore.js' },
+]);
+```
+
+##### deleteOne()
+
+```js
+// Deletes document
+// Returns Document | undefined
+
+const collection = db.getCollection('name');
+
+const result = collection.deleteOne({ username: 'zargovv' });
+```
+
+##### deleteMany()
+
+```js
+// Deletes document
+// Returns Promise<Document[]>
+
+const collection = db.getCollection('messages');
+
+const result = collection.deleteMany((doc) => doc.messageCount < 1);
+```
+
+##### updateOne()
+
+```js
+// Updates document. Returns undefined if document wasn't found.
+// Returns Document | undefined
+
+const collection = db.getCollection('name');
+
+const result = collection.updateOne({ username: 'zargovv' }, { id: '0' });
+```
+
+##### upsertOne()
+
+```js
+// Updates document. Creates new one if not found.
+// Returns Document
+
+const collection = db.getCollection('name');
+
+const result = collection.updateOne({ username: 'zargovv' }, { id: '0' });
 ```
 
 ## License

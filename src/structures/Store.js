@@ -27,10 +27,27 @@ function getFiles(filename, maindir, thisdir) {
     data.forEach(e =>
       files.push(...getFiles(path.join(filename, e), maindir, file))
     );
-  } else {
+  } else if (file.name.endsWith('.js')) {
     files.push(file);
   }
   return files;
+}
+
+function match(text, query) {
+  text = String(text).toLowerCase();
+  query = String(query)
+    .toLowerCase()
+    .replace(/ /g, '');
+  let matches = 0;
+  let pos = 0;
+  text.split('').forEach(char => {
+    if (pos >= text.length) return;
+    if (char === query[pos]) {
+      matches += 1;
+      pos += 1;
+    }
+  });
+  return matches / text.length;
 }
 
 /**
@@ -42,13 +59,53 @@ module.exports = class Store extends Collection {
 
     this.client = client;
     this.type = type;
-    this.folderName = this.client._private[`${this.type}sFolder`];
+    this.folderName = this.client._private.folders[`${this.type}s`];
     this.filePath = this.client._private.fullpath;
 
     if (defaults) {
-      this.init(defaults, path.basename(defaults));
+      this.init(defaults, path.basename(defaults), null, true);
     }
     this.init(this.filePath, this.folderName, _private);
+  }
+
+  /**
+   * @param {String} query
+   * @returns {Array} result
+   */
+  search(query) {
+    const data = [
+      ...this.filter(e => e.id !== e._id).map(e => ({
+        match: match(e.id, query),
+        [this.type]: e,
+      })),
+      ...this.map(e => ({
+        match: match(e.key, query),
+        [this.type]: e,
+      })),
+    ];
+    if (this.type === 'command') {
+      this.filter(
+        e => typeof e.aliases === 'object' && e.aliases instanceof Array
+      ).forEach(elem => {
+        data.push(
+          ...elem.aliases.map(e => ({
+            match: match(e, query),
+            [this.type]: elem,
+          }))
+        );
+      });
+    }
+    return data
+      .sort((b, a) => a.match - b.match)
+      .map(e => ({
+        ...e,
+        match: Number(String(e.match).slice(0, 4)),
+      }))
+      .filter(
+        (e, i) =>
+          e.match > 0 &&
+          data.findIndex(elem => elem[this.type]._id === e[this.type]._id) === i
+      );
   }
 
   /**
@@ -133,17 +190,21 @@ module.exports = class Store extends Collection {
               const prop = new Prop[key](this.client, this, file.path);
               prop._private = { parents };
               prop.categories = parents.reverse();
-              this.set(prop.id, prop);
+              if (!_private) this.set(prop.id, prop);
             }
           }
         } else {
           const prop = new Prop(this.client, this, file.path);
           prop._private = { parents };
           prop.categories = parents.reverse();
-          this.set(prop.id, prop);
+          if (!_private) this.set(prop.id, prop);
         }
       });
-      this.client[`${this.type}s`] = this;
+      if (!_private) {
+        this.client[`${this.type}s`] = this;
+        this.client.emit('load', this);
+        this.client.emit(`load:${this.type}s`, this);
+      }
       return this;
     } catch (err) {
       this.client.emit('error', err);

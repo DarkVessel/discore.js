@@ -1,5 +1,230 @@
 # Change Log
 
+## [1.2.1] - Dev
+
+### Added
+
+- JsonModel#fetch event
+- JsonModel#insert event
+- JsonModel#insertMany event
+- JsonModel#delete event
+- JsonModel#deleteMany event
+- JsonModel#update event
+
+- MongoModel#fetch event
+- MongoModel#insert event
+- MongoModel#insertMany event
+- MongoModel#delete event
+- MongoModel#deleteMany event
+- MongoModel#update event
+
+- SqlModel#fetch event
+- SqlModel#insert event
+- SqlModel#insertMany event
+- SqlModel#delete event
+- SqlModel#deleteMany event
+- SqlModel#update event
+
+- Document#save() method.
+
+### Removed
+
+- MongoModel#emitter property.
+- SqlModel#emitter property.
+
+- MySql#emitter property.
+
+### Fixed
+
+- `voiceChannelJoin` event.
+
+- Minor fixes.
+
+### Changed
+
+- MySql now extends EventEmitter.
+
+- JsonModel now extends EventEmitter.
+- MongoModel now extends EventEmitter.
+- SqlModel now extends EventEmitter.
+
+- Core#dbConnected event renamed: dbConnect.
+- Core#dbDisconnected event renamed: dbDisconnect.
+
+- Including `default` property isn't necessary when adding a model. It'll be set to `undefined`.
+
+## [1.0.1] - 2020-03-11
+
+### Added
+
+- SqlModel#deleteMany() method.
+- MongoModel#deleteMany() method.
+- JsonModel#deleteMany() method.
+
+- SqlModel#getData() method.
+- MongoModel#getData() method.
+- JsonModel#getData() method.
+
+- Command#cdRun() method.
+
+- `Json` structure.
+- `JsonModel` structure.
+
+- SqlModel#fetch() method.
+- SqlModel#filterKeys() method.
+- SqlModel#filter() method.
+- SqlModel#findKey() method.
+- SqlModel#getOne() method.
+- SqlModel#insertMany() method.
+- SqlModel#data property.
+
+- `Document` structure.
+
+- Mongo#collections property.
+- Mongo#getCollection() method.
+
+- MySql#collections property.
+- MySql#getCollection() method.
+
+- CoreOptions#commandOptions option.
+- CoreOptions#prefixOptions option.
+- CoreOptions#folders option.
+- CoreOptions#mobile option.
+
+- Event: `load` (Store).
+- Event: `load:{type}s` (Store).
+
+- CommandOptions#splitArgs option.
+
+- Event: `voiceChannelJoin` (oldMember: GuildMember, newMember: GuildMember).
+- Event: `voiceChannelSwitch` (oldMember: GuildMember, newMember: GuildMember).
+- Event: `voiceChannelLeave` (oldMember: GuildMember, newMember: GuildMember).
+
+- Typings.
+
+- Command#resetCooldowns method.
+
+- And much more.
+
+### Removed
+
+- CommandOptions#usage option.
+- CommandOptions#description option.
+
+- SqlModel#collection property.
+
+- Mongo#\_models property.
+- MySql#\_models property.
+
+### Fixed
+
+- Minor fixes.
+
+### Changed
+
+- Moved from discord.js v11.5.1 to v12.0.2
+
+- SqlModel#findOne() method.
+- SqlModel#insertOne() method.
+- SqlModel#deleteOne() method.
+- SqlModel#updateOne() method.
+- SqlModel#upsertOne() method.
+
+- Model has been renamed into MongoModel.
+
+- CoreOptions#inhibitorsFolder has been put into CoreOptions#folders.
+- CoreOptions#commandsFolder has been put into CoreOptions#folders.
+- CoreOptions#monitorsFolder has been put into CoreOptions#folders.
+- CoreOptions#triggersFolder has been put into CoreOptions#folders.
+- CoreOptions#eventsFolder has been put into CoreOptions#folders.
+
+- CoreOptions#inhibitorsFolder has been renamed into inhibitors.
+- CoreOptions#commandsFolder has been renamed into commands.
+- CoreOptions#monitorsFolder has been renamed into monitors.
+- CoreOptions#triggersFolder has been renamed into triggers.
+- CoreOptions#eventsFolder has been renamed into events.
+
+- CoreOptions#spaceAfterPrefix has been put into CoreOptions#prefixOptions.
+- CoreOptions#ignorePrefixCase has been put into CoreOptions#prefixOptions.
+- CoreOptions#mentionPrefix has been put into CoreOptions#prefixOptions.
+
+- CoreOptions#spaceAfterPrefix has been renamed into spaceSeparator.
+- CoreOptions#ignorePrefixCase has been renamed into ignoreCase.
+- CoreOptions#mentionPrefix has been renamed into mention.
+
+- CoreOptions#splitArgs has been put into CoreOptions#commandOptions.
+- CoreOptions#permLevels has been put into CoreOptions#commandOptions.
+- CoreOptions#ignoreCase has been put into CoreOptions#commandOptions.
+- CoreOptions#ignoreBots has been put into CoreOptions#commandOptions.
+- CoreOptions#ignoreSelf has been put into CoreOptions#commandOptions.
+
+- CoreOptions#splitArgs has been renamed into argsSeparator.
+
+- Minor changes.
+
+- And more.
+
+## [0.10.3] - 2020-01-20
+
+### Added
+
+### Fixed
+
+- ClientOptions#ignoreCase option fixed.
+- Stores now ignore non-js files.
+
+### Changed
+
+- Minor changes.
+
+## [0.10.1] - 2019-12-20
+
+### Added
+
+- Store#search method.
+- ClientOptions#mainPath option.
+
+### Fixed
+
+- Minor bugs.
+
+### Changed
+
+- Minor changes.
+
+## [0.9.8] - 2019-11-30
+
+### Added
+
+### Fixed
+
+- Command handler fix.
+
+### Changed
+
+## [0.9.7] - 2019-11-20
+
+### Added
+
+### Fixed
+
+### Changed
+
+- Now you can create mysql connection using connection options.
+
+## [0.9.6] - 2019-11-04
+
+### Added
+
+### Fixed
+
+- Mention prefix.
+- Inhibitors.
+
+### Changed
+
+- Inhibitors should return true if you want a command to run.
+
 ## [0.9.5] - 2019-10-27
 
 ### Added
@@ -127,9 +352,9 @@
 
 ### Added
 
-- DB Event: 'dbConnected'
+- DB Event: 'dbConnect'
 - DB Event: 'dbError'
-- DB Event: 'dbDisconnected'
+- DB Event: 'dbDisconnect'
 
 ### Changed
 

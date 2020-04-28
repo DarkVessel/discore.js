@@ -1,30 +1,41 @@
 const { Client } = require('discord.js');
 const path = require('path');
+const Json = require('./Json');
 const Store = require('./Store');
-const PermissionLevels = require('./PermissionLevels');
-const Collection = require('../util/Collection');
 const Mongo = require('./Mongo');
 const MySql = require('./MySql');
-const UniqueId = require('../util/UniqueId');
 const Config = require('./Config');
+const Collection = require('../util/Collection');
+const PermissionLevels = require('./PermissionLevels');
 
 const defaultOptions = {
-  eventsFolder: 'events',
-  commandsFolder: 'commands',
-  monitorsFolder: 'monitors',
-  triggersFolder: 'triggers',
-  inhibitorsFolder: 'triggers',
-  token: null,
+  mainPath: '.',
+  mobile: false,
   prefix: undefined,
-  mentionPrefix: false,
-  spaceAfterPrefix: false,
-  splitArgs: ' ',
-  ignoreCase: true,
-  ignorePrefixCase: true,
+  token: null,
+  db: null,
+};
+
+const folderDefaults = {
+  inhibitors: 'inhibitors',
+  commands: 'commands',
+  monitors: 'monitors',
+  triggers: 'triggers',
+  events: 'events',
+};
+
+const prefixDefaults = {
+  spaceSeparator: false,
+  ignoreCase: false,
+  mention: false,
+};
+
+const commandDefaults = {
+  argsSeparator: ' ',
   permLevels: new PermissionLevels(),
+  ignoreCase: false,
   ignoreBots: true,
   ignoreSelf: true,
-  db: null,
 };
 
 /**
@@ -32,49 +43,64 @@ const defaultOptions = {
  */
 module.exports = class extends Client {
   constructor(options = {}) {
-    options = { ...defaultOptions, ...options };
+    options = {
+      ...defaultOptions,
+      ...options,
+      folders: { ...(options.folders || {}), ...folderDefaults },
+      prefixOptions: { ...(options.prefixOptions || {}), ...prefixDefaults },
+      commandOptions: { ...(options.commandOptions || {}), ...commandDefaults },
+    };
     const thisOptions = {
-      eventsFolder: options.eventsFolder,
-      commandsFolder: options.commandsFolder,
-      monitorsFolder: options.monitorsFolder,
-      triggersFolder: options.triggersFolder,
-      inhibitorsFolder: options.inhibitorsFolder,
-      token: options.token,
+      inhibitorsFolder: options.folders.inhibitors,
+      commandsFolder: options.folders.commands,
+      triggersFolder: options.folders.triggers,
+      monitorsFolder: options.folders.monitors,
+      eventsFolder: options.folders.events,
+
+      ignorePrefixCase: options.prefixOptions.ignoreCase,
+      spaceSeparator: options.prefixOptions.spaceSeparator,
+      mentionPrefix: options.prefixOptions.mention,
+
+      argsSeparator: options.commandOptions.argsSeparator,
+      ignoreCase: options.commandOptions.ignoreCase,
+      permLevels: options.commandOptions.permLevels,
+      ignoreBots: options.commandOptions.ignoreBots,
+      ignoreSelf: options.commandOptions.ignoreSelf,
+
+      mainPath: path.join(module.parent.parent.filename, options.mainPath),
+      mobile: options.mobile,
       prefix: options.prefix,
-      mentionPrefix: options.mentionPrefix,
-      spaceAfterPrefix: options.spaceAfterPrefix,
-      splitArgs: options.splitArgs,
-      ignoreCase: options.ignoreCase,
-      ignorePrefixCase: options.ignorePrefixCase,
-      permLevels: options.permLevels,
-      ignoreBots: options.ignoreBots,
-      ignoreSelf: options.ignoreSelf,
+      token: options.token,
       db: options.db,
     };
-    delete options.eventsFolder;
-    delete options.commandsFolder;
-    delete options.monitorsFolder;
-    delete options.triggersFolder;
-    delete options.inhibitorsFolder;
-    delete options.token;
+    delete options.folders;
+    delete options.prefixOptions;
+    delete options.commandOptions;
+    delete options.mainPath;
+    delete options.mobile;
     delete options.prefix;
-    delete options.mentionPrefix;
-    delete options.splitArgs;
-    delete options.ignoreCase;
-    delete options.ignorePrefixCase;
-    delete options.permLevels;
-    delete options.ignoreBots;
-    delete options.ignoreSelf;
+    delete options.token;
     delete options.db;
-    super(options);
-    const { prefix, splitArgs, db } = thisOptions;
+    super({
+      ...options,
+      ...(thisOptions.mobile
+        ? {
+            ws: {
+              properties: { $browser: 'Discord iOS', $device: 'Discord iOS' },
+            },
+          }
+        : {}),
+    });
+    const { prefix, argsSeparator, db } = thisOptions;
     if (
       db !== undefined &&
       db !== null &&
       (typeof db !== 'object' ||
-        (!(db instanceof Mongo) && !(db instanceof MySql)))
+        (!(db instanceof Mongo) &&
+          !(db instanceof MySql) &&
+          !(db instanceof Json)))
     ) {
-      throw new Error('Db property must be instance of Mongo or MySql.');
+      throw new Error('Db property must be instance of Mongo, MySql or Json.');
     }
     if (prefix === undefined) thisOptions.prefix = '';
     if (
@@ -87,12 +113,10 @@ module.exports = class extends Client {
       );
     }
     if (
-      splitArgs !== undefined &&
-      splitArgs !== null &&
-      splitArgs !== 'string' &&
-      splitArgs !== 'object' &&
-      typeof splitArgs === 'object' &&
-      typeof splitArgs.test !== 'function'
+      argsSeparator !== undefined &&
+      argsSeparator !== null &&
+      typeof argsSeparator !== 'string' &&
+      !(argsSeparator instanceof RegExp)
     ) {
       throw new TypeError(
         'SplitArgs option must be a string, undefined, null or regular expression.'
@@ -104,54 +128,45 @@ module.exports = class extends Client {
      * @type {Object}
      * @private
      */
-    this._private = {};
+    this._private = { folders: {} };
+    this._private.folders.inhibitors = thisOptions.inhibitorsFolder;
+    this._private.folders.commands = thisOptions.commandsFolder;
+    this._private.folders.monitors = thisOptions.monitorsFolder;
+    this._private.folders.triggers = thisOptions.triggersFolder;
+    this._private.folders.events = thisOptions.eventsFolder;
     this._private.sentPages = new Collection();
-    this._private.eventsFolder = thisOptions.eventsFolder;
-    this._private.commandsFolder = thisOptions.commandsFolder;
-    this._private.monitorsFolder = thisOptions.monitorsFolder;
-    this._private.triggersFolder = thisOptions.triggersFolder;
-    this._private.inhibitorsFolder = thisOptions.inhibitorsFolder;
-    this._private.fullpath = require.main.filename;
-    this._private.filepath = path.basename(require.main.filename);
-    this._private.dirpath = path.dirname(require.main.filename);
+    this._private.fullpath = thisOptions.mainPath;
+    this._private.dirpath = path.dirname(this._private.fullpath);
     this.config = {};
     this.config.guild = new Config(this, thisOptions);
     this.prefix = thisOptions.prefix;
-    this.splitArgs = thisOptions.splitArgs;
+    this.argsSeparator = thisOptions.argsSeparator;
     this.ignoreCase = thisOptions.ignoreCase;
-    this.ignorePrefixCase = thisOptions.ignorePrefixCase;
     this.permLevels = thisOptions.permLevels;
     this.ignoreBots = thisOptions.ignoreBots;
     this.ignoreSelf = thisOptions.ignoreSelf;
+    this.ignorePrefixCase = thisOptions.ignorePrefixCase;
     this.db = thisOptions.db;
-    this.uniqid = new UniqueId();
-
     if (this.db) {
       if (this.db instanceof Mongo && this.db.connection) {
         this.db.connection.on('connected', () =>
-          this.emit('dbConnected', this.db)
+          this.emit('dbConnect', this.db)
         );
-        this.db.connection.on('err', err => this.emit('dbError', err));
+        this.db.connection.on('err', (err) => this.emit('dbError', err));
         this.db.connection.on('disconnected', () =>
-          this.emit('dbDisconnected', this.db)
+          this.emit('dbDisconnect', this.db)
         );
       } else if (this.db instanceof MySql) {
-        this.db.emitter.on('connected', () =>
-          this.emit('dbConnected', this.db)
-        );
-        this.db.emitter.on('error', err => this.emit('dbError', err));
-        this.db.emitter.on('disconnected', () =>
-          this.emit('dbDisconnected', this.db)
-        );
+        this.db.on('connect', () => this.emit('dbConnect', this.db));
+        this.db.on('error', (err) => this.emit('dbError', err));
+        this.db.on('disconnect', () => this.emit('dbDisconnect', this.db));
       }
     }
-
     new Store(this, 'event', path.join(__dirname, '../events'));
     new Store(this, 'monitor', path.join(__dirname, '../monitors'));
     new Store(this, 'command');
     new Store(this, 'trigger');
     new Store(this, 'inhibitor');
-
     if (thisOptions.token) this.login(thisOptions.token);
   }
 };

@@ -1,8 +1,8 @@
 const { EventEmitter } = require('events');
 const Collection = require('./Collection');
-const SqlDocument = require('./Document');
+const MongoDocument = require('./Document');
 
-module.exports = class SqlModel extends EventEmitter {
+module.exports = class MongoModel extends EventEmitter {
   constructor(db, name, options = {}, defaults = {}) {
     super();
     if (typeof name !== 'string') {
@@ -10,31 +10,13 @@ module.exports = class SqlModel extends EventEmitter {
       throw new TypeError(text);
     }
     name = name.toLowerCase();
-    this.db = db;
+    this.data = new Collection();
     this.defaults = defaults;
     this.name = name;
-    const tableOptions = [];
-    let primary = null;
-    for (const key in options) {
-      if ({}.hasOwnProperty.call(options, key)) {
-        tableOptions.push({ key, name: key, type: options[key] });
-        if (options[key].primary) primary = key;
-      }
-    }
-    if (primary) tableOptions.push(`PRIMARY KEY (${primary})`);
     this.options = options;
-    new Promise((resolve, reject) => {
-      this.db
-        .query(
-          `CREATE TABLE IF NOT EXISTS ${this.name} (${tableOptions
-            .map((e) => `${e.key} ${e.type}`)
-            .join(', ')})`
-        )
-        .on('error', reject)
-        .on('end', () => resolve(this.emit('connect')));
-    });
-    this.data = new Collection();
-    this.on('connect', () => this.fetch());
+    this.db = db;
+    if (this.db.readyState === 1) this.fetch();
+    this.db.on('connected', () => this.fetch());
     this.state = 0;
   }
 
@@ -59,20 +41,21 @@ module.exports = class SqlModel extends EventEmitter {
 
   fetch() {
     return new Promise((resolve, reject) => {
-      new Promise((res, rej) => {
-        const docs = [];
-        this.db
-          .query(`SELECT * FROM ${this.name}`)
-          .on('result', (doc) => docs.push({ ...doc }))
-          .on('error', (err) => rej(err))
-          .on('end', () => res(docs));
-      })
-        .then((docs) => {
+      this.db.collection(this.name).find({}, (err, res) => {
+        if (err) {
+          if (this.state !== 1) this.emit('error', err);
+          return reject(err);
+        }
+        res.toArray((err, docs) => {
+          if (err) {
+            if (this.state !== 1) this.emit('error', err);
+            return reject(err);
+          }
           const data = new Collection();
           for (const val of docs) {
             data.set(
               val._id,
-              new SqlDocument(this, { ...this.defaults, ...val })
+              new MongoDocument(this, { ...this.defaults, ...val })
             );
           }
           this.data = data;
@@ -82,8 +65,8 @@ module.exports = class SqlModel extends EventEmitter {
           }
           this.emit('fetch', data);
           resolve(data);
-        })
-        .catch(reject);
+        });
+      });
     });
   }
 
@@ -146,52 +129,45 @@ module.exports = class SqlModel extends EventEmitter {
       const defaults = { ...(typeof query === 'object' ? query : {}) };
       this.findOne(query, value)
         .then((doc) => {
-          resolve(
-            new SqlDocument(this, {
-              ...this.defaults,
-              ...defaults,
-              ...(doc ? doc.json() : {}),
-            })
-          );
+         const document2 = new MongoDocument(this, {
+            ...this.defaults,
+            ...defaults,
+            ...(doc ? doc.json() : {}),
+          })
+          let a = "";
+          function handlerObject(document) {
+            for (let key in document) {
+              if (!(key in document)) eval(`document2` + a + `[key]` + `= document2.defaults` + a + `[key]`);
+              const object = eval(`document2` + a + `[key]`)
+              if (typeof object != "object" || Array.isArray(object) || object == null) continue;
+              a += `["${key}"]`
+              handlerObject(eval(`document2` + a + `= document2._model.defaults` + a))
+            }
+          }
+          handlerObject(document2._doc)
+          resolve(document2);
         })
         .catch(reject);
     });
   }
 
   insertOne(data) {
-    if (typeof data !== 'object') {
-      const text = `First argument must be an object. Instead got ${typeof data}`;
-      throw new TypeError(text);
-    }
-    const document = new SqlDocument(this, { ...this.defaults, ...data });
+    const document = new MongoDocument(this, { ...this.defaults, ...data });
     this.data.set(document._id, document);
-    const insertData = [];
-    const toInsert = document.json();
-    const typeRegEx = /((^VARCHAR)|(^((TINY)|(LONG)|(MEDIUM))?TEXT))(\(.+\))?$/;
-    Object.keys(toInsert).forEach((key) => {
-      if (!toInsert[key]) toInsert[key] = 'NULL';
-      else if (new RegExp(typeRegEx.source, 'i').test(this.options[key])) {
-        toInsert[key] = `'${toInsert[key]}'`;
-      }
-      insertData.push({ key, value: document[key], name: key });
-    });
-    this.db
-      .query(
-        `INSERT INTO ${this.name} (${insertData
-          .map((e) => `\`${e.key}\``)
-          .join(', ')}) VALUES (${insertData
-          .map((e) => `'${e.value}'`)
-          .join(', ')})`
-      )
-      .on('error', (err) => {})
-      .on('result', () => {});
+    this.db.collection(this.name).insertOne(document.json());
     this.emit('insert', document);
     return document;
   }
 
   insertMany(data) {
     const documents = [];
-    for (const document of data) documents.push(this.insertOne(document));
+    for (const document of data) {
+      documents.push(
+        new MongoDocument(this, { ...this.defaults, ...document.json() })
+      );
+    }
+    for (const document of documents) this.data.set(document._id, document);
+    this.db.collection(this.name).insertMany(documents.map((d) => ({ ...d })));
     this.emit('insertMany', documents);
     return documents;
   }
@@ -203,10 +179,7 @@ module.exports = class SqlModel extends EventEmitter {
           if (key) {
             const document = this.data.get(key);
             this.data.delete(key);
-            this.db
-              .query(`DELETE FROM ${this.name} WHERE _id = '${key}'`)
-              .on('result', () => {})
-              .on('error', (err) => {});
+            this.db.collection(this.name).deleteOne({ _id: key });
             this.emit('delete', document);
             return resolve(document);
           }
@@ -237,33 +210,15 @@ module.exports = class SqlModel extends EventEmitter {
           if (!key) return resolve(undefined);
           if (typeof query !== 'string') newData = value;
           const document = this.data.get(key);
-          const newDocument = new SqlDocument(this, {
+          const newDocument = new MongoDocument(this, {
             ...this.defaults,
             ...document,
             ...newData,
           });
           this.data.set(key, newDocument);
-          const updateData = [];
-          const typeRegEx = /((^VARCHAR)|(^((TINY)|(LONG)|(MEDIUM))?TEXT))(\(.+\))?$/;
-          Object.keys(newDocument.json()).forEach((k) => {
-            if (!newDocument[k]) newDocument[k] = 'NULL';
-            else if (new RegExp(typeRegEx.source, 'i').test(this.options[k])) {
-              newDocument[k] = `'${newDocument[k]}'`;
-            }
-            updateData.push({
-              key: k,
-              name: k,
-              value: newDocument[k],
-            });
-          });
           this.db
-            .query(
-              `UPDATE ${this.name} SET ${updateData
-                .map((e) => `${e.key} = ${e.value}`)
-                .join(', ')} WHERE _id = '${key}'`
-            )
-            .on('result', () => {})
-            .on('error', (err) => {});
+            .collection(this.name)
+            .updateOne({ _id: key }, { $set: newDocument.json() });
           this.emit('update', document, newDocument);
           resolve(newDocument);
         })
