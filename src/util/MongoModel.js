@@ -129,13 +129,23 @@ module.exports = class MongoModel extends EventEmitter {
       const defaults = { ...(typeof query === 'object' ? query : {}) };
       this.findOne(query, value)
         .then((doc) => {
-          resolve(
-            new MongoDocument(this, {
-              ...this.defaults,
-              ...defaults,
-              ...(doc ? doc.json() : {}),
-            })
-          );
+         const document2 = new MongoDocument(this, {
+            ...this.defaults,
+            ...defaults,
+            ...(doc ? doc.json() : {}),
+          })
+          let a = "";
+          function handlerObject(document) {
+            for (let key in document) {
+              if (!(key in document)) eval(`document2` + a + `[key]` + `= document2.defaults` + a + `[key]`);
+              const object = eval(`document2` + a + `[key]`)
+              if (typeof object != "object" || Array.isArray(object) || object == null) continue;
+              a += `["${key}"]`
+              handlerObject(eval(`document2` + a + `= document2._model.defaults` + a))
+            }
+          }
+          handlerObject(document2._doc)
+          resolve(document2);
         })
         .catch(reject);
     });
